@@ -371,55 +371,12 @@ static uint64_t jiffies_to_usec(uint64_t jiffies)
 
 static int get_cpu_count()
 {
-    /* FIXME: linux-specific */
-    FILE *f;
-    char s[128];
-    int n = 0;
-    static const char *pattern =
-        "^physical *id +: *0*[1-9]";
-    regex_t ex;
-    int e;
+    int ncpu;
 
-    if ((e = regcomp(&ex, pattern, REG_EXTENDED | REG_ICASE)) != 0) {
-        char errbuf[128];
-        regerror(e, &ex, errbuf, sizeof(errbuf)-1);
-        errbuf[sizeof(errbuf)-1] = '\0';
-
-        err("regcomp(%s): %s\n", pattern, errbuf);
-        return -1;
-    }
-
-    f = fopen("/proc/cpuinfo", "r");
-    if (f == NULL) {
-        perror("/proc/cpuinfo");
-        exit(1);
-    }
-    while (fgets(s, sizeof(s)-1, f) != NULL) {
-        s[sizeof(s)-1] = '\0';
-        if (!strncmp(s, "processor", strlen("processor"))) {
-            n++;
-        } else {
-            e = regexec(&ex, s, 0, NULL, 0);
-            if (e == 0) {
-                /* matched a phys-id other than zero, don't count it */
-                n--;
-            } else if (e != REG_NOMATCH) {
-                char errbuf[128];
-                regerror(e, &ex, errbuf, sizeof(errbuf)-1);
-                errbuf[sizeof(errbuf)-1] = '\0';
-                err("regexec: Couldn't match '%s' in '%s': %s\n",
-                    pattern, s, errbuf);
-                return -1;
-            }
-        }
-    }
-    fclose(f);
-    if (n == 0) {
-        err("Couldn't get any CPU counts, assuming one CPU core\n");
-        err("If this is wrong, override with --ncpus\n");
-        ncpus = 1;
-    }
-    return n;
+    ncpu = sysconf(_SC_NPROCESSORS_ONLN);
+    if (ncpu < 1)
+        ncpu = 1;
+    return ncpu;
 }
 
 static uint64_t get_cpu_busy_time()
